@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Pokémon Center Queue Viewer",
+  "version": "1.0",
+  "description": "Shows your queue position on Pokémon Center.",
+  "permissions": ["activeTab", "scripting"],
+  "content_scripts": [
+    {
+      "matches": ["https://www.pokemoncenter.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["ta-da.mp3", "mac-quack.mp3"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pokemoncenterqueueviewer@jackedwards",
+      "strict_min_version": "91.0"
+    }
+  }
+}
