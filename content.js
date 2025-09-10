@@ -3,6 +3,7 @@
     let banner, msg, closeBtn;
     let lastPos = null;
     let dismissed = false;
+    let pollIntervalId = null; // store interval ID
 
     // Local sounds
     const taDaSound = new Audio(chrome.runtime.getURL('ta-da.mp3'));
@@ -59,6 +60,14 @@
     function handleQueueData(pos) {
         if (!bannerCreated) createBanner();
 
+        // Stop polling if pos is -1
+        if (pos === -1) {
+            console.warn("Queue pos is -1 — stopping poll");
+            if (pollIntervalId) clearInterval(pollIntervalId);
+            banner.style.display = "none";
+            return;
+        }
+
         // Out of queue → hide
         if (pos === null || pos <= 0) {
             banner.style.display = "none";
@@ -67,7 +76,7 @@
         }
 
         // Entered the queue (pos === 0)
-        if (pos === 0) {
+        if (pos <= 0) {
             if (lastPos !== 0) {
                 taDaSound.play().catch(() => {});
             }
@@ -102,32 +111,38 @@
     async function pollQueue() {
         try {
             const response = await fetch("https://www.pokemoncenter.com/_Incapsula_Resource?SWWRGTS=868", {
-                credentials: "include" // send cookies if needed
+                credentials: "include"
             });
             if (!response.ok) {
+                console.warn("Queue poll failed — stopping poll");
+                if (pollIntervalId) clearInterval(pollIntervalId);
                 handleQueueData(null);
                 return;
             }
 
             const data = await response.json();
-            console.log("Queue data:", data); // debug log
+            console.log("Queue data:", data);
             handleQueueData(data.pos);
         } catch (err) {
-            console.error("Queue poll error:", err);
+            console.error("Queue poll error — stopping poll:", err);
+            if (pollIntervalId) clearInterval(pollIntervalId);
             handleQueueData(null);
         }
     }
 
     // --- Start polling every 5 seconds ---
+    function startPolling() {
+        pollQueue(); // initial poll immediately
+        pollIntervalId = setInterval(pollQueue, 5000);
+    }
+
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", () => {
             createBanner();
-            pollQueue();
-            setInterval(pollQueue, 5000);
+            startPolling();
         });
     } else {
         createBanner();
-        pollQueue();
-        setInterval(pollQueue, 5000);
+        startPolling();
     }
 })();
