@@ -19,7 +19,11 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "pokemoncenterqueueviewer@jackedwards",
-      "strict_min_version": "91.0"
+      "data_collection_permissions": {
+        "required": [
+          "websiteContent"
+        ]
+      }
     }
   }
 }
