@@ -1,16 +1,14 @@
 (function() {
     let bannerCreated = false;
-    let banner, msg, closeBtn, debugInput, debugBtn;
+    let banner, msg, closeBtn;
     let lastPos = null;
     let dismissed = false;
-
-    // Toggle debug mode here
-    const DEBUG = false;
 
     // Local sounds
     const taDaSound = new Audio(chrome.runtime.getURL('ta-da.mp3'));
     const macQuackSound = new Audio(chrome.runtime.getURL('mac-quack.mp3'));
 
+    // --- Create banner immediately, hidden ---
     function createBanner() {
         banner = document.createElement("div");
         banner.id = "pkcQueueBanner";
@@ -27,7 +25,7 @@
         banner.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
         banner.style.minWidth = "200px";
         banner.style.fontSize = "0.9em";
-        banner.style.display = DEBUG ? "block" : "none";
+        banner.style.display = "none"; // start hidden
 
         const topRow = document.createElement("div");
         topRow.style.display = "flex";
@@ -36,7 +34,7 @@
 
         msg = document.createElement("div");
         msg.id = "pkcQueueMessage";
-        msg.textContent = DEBUG ? "Debug mode active" : "";
+        msg.textContent = "";
 
         closeBtn = document.createElement("button");
         closeBtn.textContent = "✖";
@@ -53,118 +51,83 @@
         topRow.appendChild(closeBtn);
         banner.appendChild(topRow);
 
-        // Add debug input if debug mode
-        if (DEBUG) {
-            const debugContainer = document.createElement("div");
-            debugContainer.style.marginTop = "6px";
-            debugContainer.style.display = "flex";
-            debugContainer.style.gap = "4px";
-
-            debugInput = document.createElement("input");
-            debugInput.type = "number";
-            debugInput.placeholder = "Queue position";
-            debugInput.style.flex = "1";
-
-            debugBtn = document.createElement("button");
-            debugBtn.textContent = "Update";
-            debugBtn.style.cursor = "pointer";
-            debugBtn.onclick = () => {
-                const val = parseInt(debugInput.value, 10);
-                if (!isNaN(val)) handleQueueData(val);
-            };
-
-            debugContainer.appendChild(debugInput);
-            debugContainer.appendChild(debugBtn);
-            banner.appendChild(debugContainer);
-        }
-
         document.body.appendChild(banner);
         bannerCreated = true;
     }
 
+    // --- Update banner based on queue position ---
     function handleQueueData(pos) {
         if (!bannerCreated) createBanner();
 
-        // User has entered the queue
-        if (pos === 0) {
-            banner.style.display = DEBUG ? "block" : "none";
-            if (lastPos !== 0) {
-                taDaSound.play().catch(() => {});
-            }
-            lastPos = pos;
-            msg.textContent = DEBUG ? "Queue entered! pos=0" : "";
-            return;
-        }
-
-        // Only show banner if position > 0 (or debug)
-        if ((pos === null || pos <= 0) && !DEBUG) {
+        // Out of queue → hide
+        if (pos === null || pos <= 0) {
             banner.style.display = "none";
             lastPos = pos;
             return;
         }
 
-        // Always quack when position changes (except hitting 0)
+        // Entered the queue (pos === 0)
+        if (pos === 0) {
+            if (lastPos !== 0) {
+                taDaSound.play().catch(() => {});
+            }
+            msg.textContent = "✅ You're in!";
+            banner.style.background = "#e6ffed";
+            banner.style.borderColor = "#2ecc71";
+            banner.style.display = "block";
+            lastPos = pos;
+            return;
+        }
+
+        // Queue position > 0
         if (lastPos !== null && lastPos !== pos) {
             macQuackSound.play().catch(() => {});
         }
 
-        // Re-show if dismissed but position changed
+        // If dismissed but position changed, re-show
         if (dismissed && lastPos !== null && lastPos !== pos) {
             banner.style.display = "block";
             dismissed = false;
         }
 
-        lastPos = pos;
-
         msg.textContent = `⏳ Queue position: ${pos}`;
         banner.style.background = "#fffae5";
         banner.style.borderColor = "#f5c518";
         banner.style.display = "block";
-    }
-    
-    if (!DEBUG) {
-        // --- Intercept fetch ---
-        const originalFetch = window.fetch;
-        window.fetch = async function(...args) {
-            const response = await originalFetch.apply(this, args);
-            try {
-                const url = args[0];
-                if (url.includes("/_Incapsula_Resource?SWWRGTS=868")) {
-                    if (!response.ok) {
-                        handleQueueData(null);
-                    } else {
-                        const cloned = response.clone();
-                        const data = await cloned.json();
-                        handleQueueData(data.pos);
-                    }
-                }
-            } catch (err) {
-                handleQueueData(null);
-            }
-            return response;
-        };
 
-        // --- Intercept XHR ---
-        const origSend = XMLHttpRequest.prototype.send;
-        XMLHttpRequest.prototype.send = function(...args) {
-            this.addEventListener("load", function() {
-                if (this.responseURL.includes("/_Incapsula_Resource")) {
-                    if (this.status >= 400) {
-                        handleQueueData(null);
-                    } else {
-                        try {
-                            const data = JSON.parse(this.responseText);
-                            handleQueueData(data.pos);
-                        } catch (err) {
-                            handleQueueData(null);
-                        }
-                    }
-                }
+        lastPos = pos;
+    }
+
+    // --- Poll the queue endpoint every 5 seconds ---
+    async function pollQueue() {
+        try {
+            const response = await fetch("https://www.pokemoncenter.com/_Incapsula_Resource?SWWRGTS=868", {
+                credentials: "include" // send cookies if needed
             });
-            origSend.apply(this, args);
-        };
+            if (!response.ok) {
+                handleQueueData(null);
+                return;
+            }
+
+            const data = await response.json();
+            console.log("Queue data:", data); // debug log
+            handleQueueData(data.pos);
+        } catch (err) {
+            console.error("Queue poll error:", err);
+            handleQueueData(null);
+        }
+    }
+
+    // --- Start polling every 5 seconds ---
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+            createBanner();
+            pollQueue();
+            setInterval(pollQueue, 5000);
+        });
     } else {
-        // Debug: show initial simulated position
-        handleQueueData(20000);
+        createBanner();
+        pollQueue();
+        setInterval(pollQueue, 5000);
     }
 })();
