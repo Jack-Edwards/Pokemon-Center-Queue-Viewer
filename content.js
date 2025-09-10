@@ -121,27 +121,15 @@
         banner.style.borderColor = "#f5c518";
         banner.style.display = "block";
     }
-
-
-    // --- Initial fetch (skipped if DEBUG) ---
+    
     if (!DEBUG) {
-        fetch("/_Incapsula_Resource", { cache: "no-store" })
-            .then(response => {
-                if (!response.ok) {
-                    handleQueueData(null);
-                } else {
-                    return response.json().then(data => handleQueueData(data.pos));
-                }
-            })
-            .catch(() => handleQueueData(null));
-
         // --- Intercept fetch ---
         const originalFetch = window.fetch;
         window.fetch = async function(...args) {
             const response = await originalFetch.apply(this, args);
             try {
                 const url = args[0];
-                if (url.includes("/_Incapsula_Resource")) {
+                if (url.includes("/_Incapsula_Resource?SWWRGTS=868")) {
                     if (!response.ok) {
                         handleQueueData(null);
                     } else {
