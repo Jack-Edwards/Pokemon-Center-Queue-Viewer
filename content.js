@@ -1,13 +1,36 @@
 (function() {
     let bannerCreated = false;
-    let banner, msg, closeBtn;
+    let banner, msg, closeBtn, soundBtn;
     let lastPos = null;
     let dismissed = false;
-    let pollIntervalId = null; // store interval ID
+    let pollIntervalId = null;
+    let soundsEnabled = true;
+    let tadaPlayed = false;
 
     // Local sounds
     const taDaSound = new Audio(chrome.runtime.getURL('ta-da.mp3'));
     const macQuackSound = new Audio(chrome.runtime.getURL('mac-quack.mp3'));
+
+    // --- Helpers ---
+    function playSound(audio) {
+        if (!soundsEnabled) return;
+        audio.play().catch(() => {});
+    }
+
+    function loadSoundSetting() {
+        chrome.storage.local.get("soundsEnabled", (data) => {
+            if (typeof data.soundsEnabled === "boolean") {
+                soundsEnabled = data.soundsEnabled;
+            }
+            if (soundBtn) {
+                soundBtn.textContent = soundsEnabled ? "🔈" : "🔇";
+            }
+        });
+    }
+
+    function saveSoundSetting() {
+        chrome.storage.local.set({ soundsEnabled });
+    }
 
     // --- Create banner immediately, hidden ---
     function createBanner() {
@@ -32,11 +55,13 @@
         topRow.style.display = "flex";
         topRow.style.justifyContent = "space-between";
         topRow.style.alignItems = "center";
+        topRow.style.gap = "6px";
 
         msg = document.createElement("div");
         msg.id = "pkcQueueMessage";
         msg.textContent = "";
 
+        // Close button
         closeBtn = document.createElement("button");
         closeBtn.textContent = "✖";
         closeBtn.style.background = "transparent";
@@ -48,38 +73,61 @@
             dismissed = true;
         };
 
+        // Sound toggle button
+        soundBtn = document.createElement("button");
+        soundBtn.textContent = "🔈";
+        soundBtn.style.background = "transparent";
+        soundBtn.style.border = "none";
+        soundBtn.style.fontSize = "1em";
+        soundBtn.style.cursor = "pointer";
+        soundBtn.onclick = () => {
+            soundsEnabled = !soundsEnabled;
+            soundBtn.textContent = soundsEnabled ? "🔈" : "🔇";
+            saveSoundSetting();
+        };
+
         topRow.appendChild(msg);
+        topRow.appendChild(soundBtn);
         topRow.appendChild(closeBtn);
         banner.appendChild(topRow);
 
         document.body.appendChild(banner);
         bannerCreated = true;
+
+        // Initialize from storage
+        loadSoundSetting();
     }
 
     // --- Update banner based on queue position ---
     function handleQueueData(pos) {
         if (!bannerCreated) createBanner();
 
+        // 🎵 Transition into success (only once)
+        if (lastPos > 1 && (pos === null || pos <= 0)) {
+            if (!tadaPlayed) {
+                playSound(taDaSound);
+                tadaPlayed = true;
+            }
+        }
+
         // Stop polling if pos is -1
         if (pos === -1) {
             console.warn("Queue pos is -1 — stopping poll");
             if (pollIntervalId) clearInterval(pollIntervalId);
             banner.style.display = "none";
+            lastPos = pos;
             return;
         }
 
-        // Out of queue → hide
-        if (pos === null || pos <= 0) {
+        // Hide if poll failed
+        if (pos === null) {
             banner.style.display = "none";
             lastPos = pos;
             return;
         }
 
-        // Entered the queue (pos === 0)
-        if (pos <= 0) {
-            if (lastPos !== 0) {
-                taDaSound.play().catch(() => {});
-            }
+        // ✅ You're in!
+        if (pos === 0) {
             msg.textContent = "✅ You're in!";
             banner.style.background = "#e6ffed";
             banner.style.borderColor = "#2ecc71";
@@ -88,22 +136,24 @@
             return;
         }
 
-        // Queue position > 0
+        // Still in queue (pos > 0)
         if (lastPos !== null && lastPos !== pos) {
-            macQuackSound.play().catch(() => {});
+            playSound(macQuackSound);
+            if (dismissed) {
+                banner.style.display = "block";
+                dismissed = false;
+            }
         }
 
-        // If dismissed but position changed, re-show
-        if (dismissed && lastPos !== null && lastPos !== pos) {
-            banner.style.display = "block";
-            dismissed = false;
+        // Reset tada if back in queue
+        if (pos > 0) {
+            tadaPlayed = false;
         }
 
         msg.textContent = `⏳ Queue position: ${pos}`;
         banner.style.background = "#fffae5";
         banner.style.borderColor = "#f5c518";
         banner.style.display = "block";
-
         lastPos = pos;
     }
 
