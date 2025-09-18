@@ -18,22 +18,29 @@
     }
 
     function loadSoundSetting() {
-        chrome.storage.local.get("soundsEnabled", (data) => {
-            if (typeof data.soundsEnabled === "boolean") {
-                soundsEnabled = data.soundsEnabled;
-            }
-            if (soundBtn) {
-                soundBtn.textContent = soundsEnabled ? "🔈" : "🔇";
-            }
-        });
+        if (chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get("soundsEnabled", (data) => {
+                if (typeof data.soundsEnabled === "boolean") {
+                    soundsEnabled = data.soundsEnabled;
+                }
+                if (soundBtn) {
+                    soundBtn.textContent = soundsEnabled ? "🔈" : "🔇";
+                }
+            });
+        }
     }
 
     function saveSoundSetting() {
-        chrome.storage.local.set({ soundsEnabled });
+        if (chrome.storage && chrome.storage.local) {
+            chrome.storage.local.set({ soundsEnabled });
+        }
     }
 
     // --- Create banner immediately, hidden ---
     function createBanner() {
+        if (bannerCreated) return;
+        bannerCreated = true;
+
         banner = document.createElement("div");
         banner.id = "pkcQueueBanner";
         banner.style.position = "fixed";
@@ -46,16 +53,15 @@
         banner.style.fontFamily = "sans-serif";
         banner.style.fontWeight = "bold";
         banner.style.zIndex = "9999";
-        banner.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
-        banner.style.minWidth = "200px";
+        banner.style.minWidth = "220px"; // slightly wider for extra button
         banner.style.fontSize = "0.9em";
-        banner.style.display = "none"; // start hidden
+        banner.style.display = "none";
+        banner.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
 
         const topRow = document.createElement("div");
         topRow.style.display = "flex";
         topRow.style.justifyContent = "space-between";
         topRow.style.alignItems = "center";
-        topRow.style.gap = "6px";
 
         msg = document.createElement("div");
         msg.id = "pkcQueueMessage";
@@ -73,9 +79,13 @@
             dismissed = true;
         };
 
-        // Sound toggle button
+        topRow.appendChild(msg);
+        topRow.appendChild(closeBtn);
+        banner.appendChild(topRow);
+
+        // Sound toggle button on its own row, centered
         soundBtn = document.createElement("button");
-        soundBtn.textContent = "🔈";
+        soundBtn.textContent = soundsEnabled ? "🔈" : "🔇";
         soundBtn.style.background = "transparent";
         soundBtn.style.border = "none";
         soundBtn.style.fontSize = "1em";
@@ -86,10 +96,13 @@
             saveSoundSetting();
         };
 
-        topRow.appendChild(msg);
-        topRow.appendChild(soundBtn);
-        topRow.appendChild(closeBtn);
-        banner.appendChild(topRow);
+        const soundRow = document.createElement("div");
+        soundRow.style.display = "flex";
+        soundRow.style.justifyContent = "center"; // center horizontally
+        soundRow.style.marginTop = "4px"; // optional spacing
+        soundRow.appendChild(soundBtn);
+
+        banner.appendChild(soundRow);
 
         document.body.appendChild(banner);
         bannerCreated = true;

@@ -3,7 +3,7 @@
   "name": "Pokémon Center Queue Viewer",
   "version": "1.3.0",
   "description": "Shows your queue position on Pokémon Center.",
-  "permissions": [],
+  "permissions": ["storage"],
   "content_scripts": [
     {
       "matches": ["https://www.pokemoncenter.com/*"],
