@@ -195,7 +195,6 @@
 
     // --- Start polling every 5 seconds ---
     function startPolling() {
-        pollQueue(); // initial poll immediately
         pollIntervalId = setInterval(pollQueue, 5000);
     }
 
