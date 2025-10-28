@@ -1,7 +1,7 @@
 (function() {
     let bannerCreated = false;
     let banner, msg, closeBtn, soundBtn;
-    let lastPos = null;
+    let lastTtw = null;
     let dismissed = false;
     let pollIntervalId = null;
     let soundsEnabled = true;
@@ -111,46 +111,46 @@
         loadSoundSetting();
     }
 
-    // --- Update banner based on queue position ---
-    function handleQueueData(pos) {
+    // --- Update banner based on queue ttw ---
+    function handleQueueData(ttw) {
         if (!bannerCreated) createBanner();
 
         // 🎵 Transition into success (only once)
-        if (lastPos > 1 && (pos === null || pos <= 0)) {
+        if (lastTtw > 1 && (ttw === null || ttw <= 0)) {
             if (!tadaPlayed) {
                 playSound(taDaSound);
                 tadaPlayed = true;
             }
         }
 
-        // Stop polling if pos is -1
-        if (pos === -1) {
-            console.warn("Queue pos is -1 — stopping poll");
+        // Stop polling if ttw is -1
+        if (ttw === -1) {
+            console.warn("Queue ttw is -1 — stopping poll");
             if (pollIntervalId) clearInterval(pollIntervalId);
             banner.style.display = "none";
-            lastPos = pos;
+            lastTtw = ttw;
             return;
         }
 
         // Hide if poll failed
-        if (pos === null) {
+        if (ttw === null) {
             banner.style.display = "none";
-            lastPos = pos;
+            lastTtw = ttw;
             return;
         }
 
         // ✅ You're in!
-        if (pos === 0) {
+        if (ttw === 0) {
             msg.textContent = "✅ You're in!";
             banner.style.background = "#e6ffed";
             banner.style.borderColor = "#2ecc71";
             banner.style.display = "block";
-            lastPos = pos;
+            lastTtw = ttw;
             return;
         }
 
-        // Still in queue (pos > 0)
-        if (lastPos !== null && lastPos !== pos) {
+        // Still in queue (ttw > 0)
+        if (lastTtw !== null && lastTtw !== ttw) {
             playSound(macQuackSound);
             if (dismissed) {
                 banner.style.display = "block";
@@ -159,15 +159,15 @@
         }
 
         // Reset tada if back in queue
-        if (pos > 0) {
+        if (ttw > 0) {
             tadaPlayed = false;
         }
 
-        msg.textContent = `⏳ Queue position: ${pos}`;
+        msg.textContent = `⏳ Queue time to wait: ${ttw}`;
         banner.style.background = "#fffae5";
         banner.style.borderColor = "#f5c518";
         banner.style.display = "block";
-        lastPos = pos;
+        lastTtw = ttw;
     }
 
     // --- Poll the queue endpoint every 5 seconds ---
@@ -185,7 +185,7 @@
 
             const data = await response.json();
             console.log("Queue data:", data);
-            handleQueueData(data.pos);
+            handleQueueData(data.ttw);
         } catch (err) {
             console.error("Queue poll error — stopping poll:", err);
             if (pollIntervalId) clearInterval(pollIntervalId);
